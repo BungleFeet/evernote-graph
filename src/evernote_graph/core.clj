@@ -3,7 +3,7 @@
     [clojurewerkz.propertied.properties :as p]
     [clojure.java.io :as io]
     [clojurenote.notes :as notes])
-  (:import (com.tinkerpop.blueprints.impls.orient OrientGraphFactory OrientVertex OrientElement OrientBaseGraph)
+  (:import (com.tinkerpop.blueprints.impls.orient OrientGraphFactory OrientVertex OrientElement OrientBaseGraph OrientConfigurableGraph OrientConfigurableGraph$Settings)
            (com.evernote.edam.type Notebook))
   (:gen-class))
 
@@ -26,8 +26,14 @@
 (defonce conn (-> (OrientGraphFactory. "plocal:./db")
                   (.setupPool 1 10)))
 
+(defn- configure-graph! [^OrientBaseGraph graph]
+  (let [settings (doto (OrientConfigurableGraph$Settings.)
+                   (.setSaveOriginalIds true))]
+    (.configure graph settings)))
+
 (defn with-graph-txn! [update-fn]
   (let [graph (.getTx conn)]
+    ;(configure-graph! graph)
     (try
       (let [result (update-fn graph)]
         (.commit graph)
@@ -63,13 +69,13 @@
   (into {} (map (fn [[k v]] [(keyword k) v]) m)))
 
 (defn- en-object-graph-id [object]
-  (let [obj-class (.getSimpleName (.getClass object))
-        obj-guid (.getGuid object)]
-    (str "class:" obj-class "," obj-guid)))
+  (let [obj-class (.getSimpleName (.getClass object))]
+    (str "class:" obj-class)))
 
 (defn- en-object-props [object]
   (condp instance? object
-    Notebook {:name (.getName object)}))
+    Notebook {:name (.getName object)
+              :guid (.getGuid object)}))
 
 (defn- set-vertex-props! [^OrientVertex vertex props]
   (doseq [[k v] (map identity props)]
