@@ -12,7 +12,7 @@
   [& args]
   (println "Hello, World!"))
 
-(defn load-auth-properties
+(defn- load-auth-properties
   "Load the access-token, notestore-url and notestore object from the app configuration"
   []
   (let [auth (-> (io/resource "auth.properties")
@@ -49,7 +49,7 @@
 
 (defonce notebook-type (create-vertex-type "Notebook"))
 
-(defn get-nested-prop [object path]
+(defn- get-nested-prop [object path]
   (let [object-map (bean object)
         path-seq (seq path)
         prop-key (first path-seq)
@@ -59,36 +59,38 @@
       (bean value)
       (recur value remaining-path))))
 
-(defn keywordify [m]
+(defn- keywordify [m]
   (into {} (map (fn [[k v]] [(keyword k) v]) m)))
 
-(defn en-object-graph-id [object]
+(defn- en-object-graph-id [object]
   (let [obj-class (.getSimpleName (.getClass object))
         obj-guid (.getGuid object)]
     (str "class:" obj-class "," obj-guid)))
 
-(defn en-object-props [object]
+(defn- en-object-props [object]
   (condp instance? object
     Notebook {:name (.getName object)}))
 
-(defn set-vertex-props! [^OrientVertex vertex props]
+(defn- set-vertex-props! [^OrientVertex vertex props]
   (doseq [[k v] (map identity props)]
-    (. vertex (setProperty (name k) v))))
+    (.setProperty vertex (name k) v))
+  vertex)
 
-(defn graph-object-props [^OrientElement element]
+(defn- graph-object-props [^OrientElement element]
   (keywordify (into {} (.getProperties element))))
 
 (defn add-vertex! [object]
   (let [v-id (en-object-graph-id object)
-        v-props (en-object-props object)
-        update-fn (fn [graph]
-                    (let [vertex (.addVertex graph v-id)]
-                      (set-vertex-props! vertex v-props)
-                      (.commit graph)
-                      (graph-object-props vertex)))]
-    (with-graph-txn! update-fn)))
+        v-props (en-object-props object)]
+    (with-graph-txn! (fn [graph]
+                       (-> graph
+                           (.addVertex v-id)
+                           (set-vertex-props! v-props)
+                           (graph-object-props))))))
 
 (defn vertices []
   (with-graph-txn! (fn [graph]
-                     (let [verts (.getVertices graph)]
-                       (map graph-object-props (seq verts))))))
+                     (->> graph
+                          (.getVertices)
+                          (seq)
+                          (map graph-object-props)))))
