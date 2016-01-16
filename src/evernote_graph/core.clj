@@ -48,12 +48,12 @@
   (with-graph! (fn [^OrientBaseGraph graph]
                  (.getVertexType graph name))))
 
-(defn create-vertex-type [^String name]
+(defn create-vertex-type! [^String name]
   (when (nil? (get-vertex-type name))
     (with-graph! (fn [^OrientBaseGraph graph]
                    (.createVertexType graph name)))))
 
-(defonce notebook-type (create-vertex-type "Notebook"))
+(defonce notebook-type (create-vertex-type! "Notebook"))
 
 (defn- get-nested-prop [object path]
   (let [object-map (bean object)
